@@ -1,0 +1,73 @@
+import numpy as np
+
+class Gates:
+    def __init__(self, initial_learning_rate=0.1):
+        # Initialize weights and biases for each gate
+        self.not_weight = np.array([1])
+        self.and_weight = np.array([-1, 1])
+        self.or_weight = np.array([1, -4])
+        self.or_bias = 1
+        self.and_bias = -7
+        self.not_bias = 0.1
+        self.learning_rate = initial_learning_rate
+
+    def activation(self, x):
+        return 1 if x >= 0 else 0
+    
+    def perceptron(self, x, w, b):
+        res = np.dot(x, w) + b
+        return self.activation(res)
+    
+    def NOT_function(self, x):
+        return self.perceptron(np.array([x]), self.not_weight, self.not_bias)
+    
+    def AND_function(self, x):
+        return self.perceptron(np.array(x), self.and_weight, self.and_bias)
+    
+    def OR_function(self, x):
+        return self.perceptron(np.array(x), self.or_weight, self.or_bias)
+    
+    def XOR_function(self, x):
+        y0 = self.NOT_function(x[0])
+        y1 = self.NOT_function(x[1])
+        z1 = self.AND_function([y0, x[1]])
+        z2 = self.AND_function([y1, x[0]])
+        return self.OR_function([z1, z2])
+    
+    def NXOR_function(self, x):
+        return self.NOT_function(self.XOR_function(x))
+    
+    def update_weight(self, inp, out, tar, weight):
+        adaptive_lr = self.learning_rate * (1.1 if out != tar else 1)
+        return weight + adaptive_lr * (tar - out) * inp
+
+    def update_gate(self, gate_type, inp, tar, weight, bias):
+        i = 0
+        while i < len(inp):
+            out = gate_type(inp[i])
+            if tar[i] != out:
+                weight = self.update_weight(inp[i], out, tar[i], weight)
+                bias += 0.1 * (tar[i] - out)  # Update bias
+                print(f"Updated weights: {weight}, bias: {bias}")
+                i = 0  # Restart to check all inputs
+            else:
+                i += 1
+        return weight, bias
+
+    def train(self):
+        # Training data for each gate
+        not_inp = np.array([1, 0])
+        not_tar = np.array([0, 1])
+        self.not_weight, self.not_bias = self.update_gate(self.NOT_function, not_inp, not_tar, self.not_weight, self.not_bias)
+
+        and_inp = np.array([(0, 0), (1, 0), (0, 1), (1, 1)])
+        and_tar = np.array([0, 0, 0, 1])
+        self.and_weight, self.and_bias = self.update_gate(self.AND_function, and_inp, and_tar, self.and_weight, self.and_bias)
+
+        or_inp = np.array([(0, 0), (1, 0), (0, 1), (1, 1)])
+        or_tar = np.array([0, 1, 1, 1])
+        self.or_weight, self.or_bias = self.update_gate(self.OR_function, or_inp, or_tar, self.or_weight, self.or_bias)
+
+# Usage
+gates = Gates()
+gates.train()
