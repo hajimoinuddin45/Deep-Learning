@@ -1,0 +1,91 @@
+import tensorflow as tf
+from tensorflow.keras import layers, models, optimizers
+from tensorflow.keras.callbacks import EarlyStopping, LearningRateScheduler
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+# Function to generate random data
+def create_data():
+    X = np.random.randn(1000, 10)  # 1000 samples, 10 features
+    y = np.random.randn(1000, 1)   # 1000 target values
+    return X, y
+
+# Function to create a simple neural network model
+def create_model():
+    model = models.Sequential([
+        layers.Dense(50, activation='relu', input_shape=(10,)),
+        layers.Dense(20, activation='relu'),
+        layers.Dense(1)
+    ])
+    return model
+
+# Learning rate scheduler for Adam optimizer (decays after 20 epochs)
+def lr_scheduler(epoch, lr):
+    if epoch < 20:
+        return lr
+    else:
+        return lr * tf.math.exp(-0.1)
+
+# Function to train the model with early stopping and learning rate scheduling
+def train_model(model, optimizer, X_train, y_train, X_val, y_val, batch_size, epochs, optimizer_name):
+    model.compile(optimizer=optimizer, loss='mean_squared_error')
+    
+    # Early stopping to prevent overfitting
+    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True, verbose=1)
+    
+    # Learning rate scheduler callback for Adam
+    if optimizer_name == 'Adam':
+        lr_callback = LearningRateScheduler(lr_scheduler, verbose=1)
+        callbacks = [early_stopping, lr_callback]
+    else:
+        callbacks = [early_stopping]
+    
+    # Train the model with validation data
+    history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size,
+                        validation_data=(X_val, y_val), verbose=0, callbacks=callbacks)
+    
+    return history
+
+# Main execution
+X, y = create_data()
+
+# Standardize the data (zero mean, unit variance)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Split the data into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+
+# Create models for both optimizers
+model_sgd = create_model()
+model_adam = create_model()
+
+# Define the optimizers
+optimizer_sgd = optimizers.SGD(learning_rate=0.01)
+optimizer_adam = optimizers.Adam(learning_rate=0.001)
+
+# Set epochs and batch size
+epochs = 50
+batch_size = 32
+
+# Train with SGD optimizer
+print("\nTraining with SGD Optimizer:")
+sgd_history = train_model(model_sgd, optimizer_sgd, X_train, y_train, X_val, y_val, batch_size, epochs, 'SGD')
+
+# Train with Adam optimizer
+print("\nTraining with Adam Optimizer:")
+adam_history = train_model(model_adam, optimizer_adam, X_train, y_train, X_val, y_val, batch_size, epochs, 'Adam')
+
+# Plot the loss curves for both optimizers
+plt.plot(sgd_history.history['loss'], label='SGD - Training Loss', color='blue')
+plt.plot(sgd_history.history['val_loss'], label='SGD - Validation Loss', color='lightblue')
+plt.plot(adam_history.history['loss'], label='Adam - Training Loss', color='orange')
+plt.plot(adam_history.history['val_loss'], label='Adam - Validation Loss', color='yellow')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('SGD vs Adam Optimizer: Training vs Validation Loss Comparison')
+plt.legend()
+plt.grid(True)
+plt.show()
