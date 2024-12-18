@@ -1,0 +1,76 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import SimpleRNN, Dense, Dropout
+from tensorflow.keras.utils import to_categorical
+from PIL import Image
+import matplotlib.pyplot as plt
+from google.colab import files
+
+# Load and preprocess the MNIST dataset
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+x_train, x_test = x_train / 255.0, x_test / 255.0
+
+y_train = to_categorical(y_train, num_classes=10)
+y_test = to_categorical(y_test, num_classes=10)
+
+# Define RNN input dimensions
+timesteps, input_dim = x_train.shape[1], x_train.shape[2]
+
+# Build the RNN model
+model = Sequential([
+    SimpleRNN(128, input_shape=(timesteps, input_dim), activation='relu', return_sequences=True),
+    Dropout(0.2),
+    SimpleRNN(64, activation='relu'),
+    Dropout(0.2),
+    Dense(64, activation='relu'),
+    Dense(10, activation='softmax')
+])
+
+# Compile the model
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Train the model
+model.fit(x_train, y_train, epochs=5, batch_size=64, validation_split=0.2)
+
+# Evaluate the model
+test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=2)
+print(f"Test Accuracy: {test_accuracy:.2f}")
+
+# Function to process and predict uploaded image
+def predict_handwritten_image():
+    uploaded = files.upload()
+    image_path = next(iter(uploaded))
+    img = Image.open(image_path).convert('L').resize((28, 28))
+    img_array = np.array(img) / 255.0
+    img_array = img_array.reshape(1, 28, 28)
+
+    prediction = model.predict(img_array)
+    predicted_class = np.argmax(prediction)
+
+    plt.imshow(img, cmap='gray')
+    plt.title(f"Predicted Class: {predicted_class}")
+    plt.show()
+    
+    return predicted_class, img_array
+
+# Continuous loop for new predictions and fine-tuning
+while True:
+    predicted_class, img_array = predict_handwritten_image()
+    print(f"Predicted digit: {predicted_class}")
+
+    correct_label = input("Enter the correct label for this image (or type 'q' to quit): ")
+    if correct_label.lower() == 'q':
+        print("Exiting the program.")
+        break
+
+    try:
+        correct_label = int(correct_label)
+        correct_label_onehot = to_categorical([correct_label], num_classes=10)
+        model.fit(img_array, correct_label_onehot, epochs=1, batch_size=1)
+
+        test_loss, test_accuracy = model.evaluate(x_test, y_test, verbose=2)
+        print(f"Test Accuracy after fine-tuning: {test_accuracy:.2f}")
+    except ValueError:
+        print("Invalid input. Please enter a number between 0 and 9.")
